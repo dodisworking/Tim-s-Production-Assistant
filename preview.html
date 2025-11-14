@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Run Tester</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+    }
+    button {
+      background-color: red;
+      color: white;
+      padding: 20px 40px;
+      border: none;
+      cursor: pointer;
+      font-size: 24px;
+      border-radius: 8px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+    button:hover {
+      background-color: #cc0000;
+    }
+    #testerBox {
+      display: none;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      max-width: 400px;
+      width: 100%;
+    }
+    #testerBox h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    #testerBox input {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      margin: 15px 0;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #testerBox button {
+      width: 100%;
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    #testerBox button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <button onclick="openTester()">Open Tester</button>
+  
+  <div id="testerBox">
+    <h2>hello</h2>
+    <p>Type whatever you want below:</p>
+    <input type="text" id="userInput" placeholder="Type here..." autofocus>
+    <button onclick="saveToSheet()">Confirmed</button>
+    <div id="statusMessage" style="margin-top: 10px; font-weight: bold;"></div>
+  </div>
+
+  <script>
+    function openTester() {
+      document.getElementById('testerBox').style.display = 'block';
+      document.getElementById('userInput').focus();
+      document.getElementById('statusMessage').textContent = '';
+    }
+    
+    function saveToSheet() {
+      var input = document.getElementById('userInput').value;
+      var statusMsg = document.getElementById('statusMessage');
+      
+      if (!input.trim()) {
+        statusMsg.textContent = 'Error: Please enter a value';
+        statusMsg.style.color = 'red';
+        return;
+      }
+      
+      // Show loading
+      statusMsg.textContent = 'Saving...';
+      statusMsg.style.color = 'blue';
+      
+      // Use form submission to hidden iframe and check response
+      var form = document.createElement('form');
+      form.method = 'POST';
+      form.action = 'https://script.google.com/macros/s/AKfycbzVGx9MbAuqmL7VsSYrjh6r-Wh0Aqqg4LvXF97IfgP8XcAAb3sDOnaUlEN6JqWwP6nP/exec';
+      form.target = 'hiddenFrame';
+      
+      var inputField = document.createElement('input');
+      inputField.type = 'hidden';
+      inputField.name = 'inputValue';
+      inputField.value = input;
+      form.appendChild(inputField);
+      
+      document.body.appendChild(form);
+      
+      // Listen for iframe load to check if it succeeded
+      var iframe = document.createElement('iframe');
+      iframe.name = 'hiddenFrame';
+      iframe.style.display = 'none';
+      iframe.onload = function() {
+        setTimeout(function() {
+          try {
+            var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            var responseText = iframeDoc.body ? iframeDoc.body.textContent : '';
+            
+            if (responseText.includes('Success') || responseText.trim() === '') {
+              statusMsg.textContent = 'Success! Value saved to A1';
+              statusMsg.style.color = 'green';
+              document.getElementById('userInput').value = '';
+            } else {
+              statusMsg.textContent = 'Error: Could not save to cell A1. Check your sheet permissions.';
+              statusMsg.style.color = 'red';
+            }
+          } catch (e) {
+            // Cross-origin issue, check if sheet was updated by checking again
+            statusMsg.textContent = 'Check your sheet - it may have saved, or there was an error.';
+            statusMsg.style.color = 'orange';
+          }
+          document.body.removeChild(form);
+          document.body.removeChild(iframe);
+        }, 1000);
+      };
+      
+      document.body.appendChild(iframe);
+      form.submit();
+      
+      // Fallback timeout in case iframe doesn't load
+      setTimeout(function() {
+        if (statusMsg.textContent === 'Saving...') {
+          statusMsg.textContent = 'Error: Request timed out. Check your sheet to see if it saved.';
+          statusMsg.style.color = 'red';
+        }
+      }, 5000);
+    }
+    
+    // Allow Enter key to submit
+    document.getElementById('userInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        saveToSheet();
+      }
+    });
+  </script>
+</body>
+</html>
+

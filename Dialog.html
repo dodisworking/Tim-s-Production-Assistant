@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      width: 100%;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <input type="text" id="inputField" placeholder="Type something here..." autofocus>
+  <button onclick="confirmInput()">Confirmed</button>
+
+  <script>
+    function confirmInput() {
+      var input = document.getElementById('inputField').value;
+      if (input.trim() === '') {
+        alert('Please enter a value');
+        return;
+      }
+      
+      google.script.run
+        .withSuccessHandler(function() {
+          alert('Value written to A1!');
+          document.getElementById('inputField').value = '';
+        })
+        .withFailureHandler(function(error) {
+          alert('Error: ' + error.message);
+        })
+        .writeToCell(input);
+    }
+
+    // Allow Enter key to submit
+    document.getElementById('inputField').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        confirmInput();
+      }
+    });
+  </script>
+</body>
+</html>
+
