@@ -3505,7 +3505,12 @@
         async function showAdminPanel() {
             const adminPanel = document.getElementById('adminPanel');
             if (!adminPanel.classList.contains('active')) {
-                const password = prompt('Enter admin password:');
+                const companyName = prompt("Welcome to Ogilvy, I am Tim's Production Assistant here to help you.\n\nFirst! What is the name of your company?");
+                if (companyName === null) {
+                    return;
+                }
+                
+                const password = prompt('Please enter the admin password:');
                 if (password !== ADMIN_PASSWORD) {
                     alert('Incorrect password.');
                     return;
