@@ -159,6 +159,12 @@
             color: #fff;
         }
 
+        .step .step-question {
+            font-size: 1.8rem;
+            margin-bottom: 30px;
+            color: #fff;
+        }
+
         .step p {
             font-size: 1.2rem;
             margin-bottom: 30px;
@@ -2218,8 +2224,9 @@
     <div class="container">
         <!-- Step 1: Company Name -->
         <div class="step active" id="step1">
-            <h1>Welcome to Tim's Production Assistant</h1>
-            <h2>Hello! What is the name of your company?</h2>
+            <h1>Welcome to Ogilvy</h1>
+            <h2>This is our AI production assistant</h2>
+            <div class="step-question">First what is the name of your company?</div>
             <div class="form-group">
                 <input type="text" id="companyName" placeholder="Enter your company name">
             </div>
@@ -3505,12 +3512,7 @@
         async function showAdminPanel() {
             const adminPanel = document.getElementById('adminPanel');
             if (!adminPanel.classList.contains('active')) {
-                const companyName = prompt("Welcome to Ogilvy, I am Tim's Production Assistant here to help you.\n\nFirst! What is the name of your company?");
-                if (companyName === null) {
-                    return;
-                }
-                
-                const password = prompt('Please enter the admin password:');
+                const password = prompt('Password:');
                 if (password !== ADMIN_PASSWORD) {
                     alert('Incorrect password.');
                     return;
