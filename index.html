@@ -2989,6 +2989,7 @@
             // Show time slots
             const timeSlotsContainer = document.getElementById('timeSlots');
             timeSlotsContainer.innerHTML = '';
+            document.getElementById('step3Btn').disabled = true;
 
             timeSlots.forEach(slot => {
                 const slotElement = document.createElement('div');
@@ -3008,9 +3009,6 @@
                 slotElement.onclick = () => selectTimeSlot(slotElement, slot);
                 timeSlotsContainer.appendChild(slotElement);
             });
-
-            // Enable continue button
-            document.getElementById('step3Btn').disabled = false;
         }
 
         function selectTimeSlot(element, slot) {
@@ -3021,6 +3019,7 @@
                 s.classList.remove('selected');
             });
             element.classList.add('selected');
+            document.getElementById('step3Btn').disabled = false;
         }
 
         // Food selection function
@@ -3241,54 +3240,134 @@
         function submitToGoogleSheets(action, data, callback) {
             console.log('📤 submitToGoogleSheets called:', { action, data, url: GOOGLE_SHEETS_URL });
             
-            const iframe = document.createElement('iframe');
-            iframe.name = 'hiddenFrame_' + Date.now();
-            iframe.style.display = 'none';
-            iframe.style.width = '0';
-            iframe.style.height = '0';
-            document.body.appendChild(iframe);
-
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = GOOGLE_SHEETS_URL;
-            form.target = iframe.name;
-            form.style.display = 'none';
-
-            // Add action
-            const actionInput = document.createElement('input');
-            actionInput.type = 'hidden';
-            actionInput.name = 'action';
-            actionInput.value = action || '';
-            form.appendChild(actionInput);
-            console.log('Form field: action =', action || '');
-
-            // Add all data fields
-            Object.keys(data).forEach(key => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = key;
-                input.value = (data[key] !== null && data[key] !== undefined) ? String(data[key]) : '';
-                form.appendChild(input);
-                console.log('Form field:', key, '=', input.value);
-            });
-
-            document.body.appendChild(form);
-            
-            console.log('✅ Submitting form to:', GOOGLE_SHEETS_URL);
-            form.submit();
-
-            // Cleanup after delay
-            setTimeout(() => {
-                try {
-                    if (form.parentNode) form.parentNode.removeChild(form);
-                    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-                } catch (e) {}
-            }, 2000);
-
-            // Call callback if provided
-            if (callback) {
-                setTimeout(callback, 1500);
+            const payload = new URLSearchParams();
+            if (action) {
+                payload.append('action', action);
+                console.log('Form field: action =', action);
             }
+            
+            if (data && typeof data === 'object') {
+                Object.keys(data).forEach(key => {
+                    const value = (data[key] !== null && data[key] !== undefined) ? String(data[key]) : '';
+                    payload.append(key, value);
+                    console.log('Form field:', key, '=', value);
+                });
+            }
+            
+            const submitViaFetch = async () => {
+                try {
+                    const response = await fetch(GOOGLE_SHEETS_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                        body: payload.toString(),
+                        cache: 'no-store',
+                        redirect: 'follow',
+                        mode: 'cors'
+                    });
+                    
+                    const text = await response.text();
+                    console.log('📬 Google Sheets response:', text);
+                    
+                    if (!response.ok || (typeof text === 'string' && text.toLowerCase().includes('error'))) {
+                        throw new Error(`Google Sheets returned error: ${text}`);
+                    }
+                    
+                    return text;
+                } catch (error) {
+                    console.warn('⚠️ Fetch submit failed, falling back to iframe method:', error);
+                    return submitViaIframe();
+                }
+            };
+            
+            const submitViaIframe = () => {
+                return new Promise((resolve) => {
+                    const iframe = document.createElement('iframe');
+                    iframe.name = 'hiddenFrame_' + Date.now();
+                    iframe.style.display = 'none';
+                    iframe.style.width = '0';
+                    iframe.style.height = '0';
+                    document.body.appendChild(iframe);
+
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = GOOGLE_SHEETS_URL;
+                    form.target = iframe.name;
+                    form.style.display = 'none';
+
+                    // Add all payload entries to the form
+                    for (const [key, value] of payload.entries()) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = key;
+                        input.value = value;
+                        form.appendChild(input);
+                    }
+
+                    document.body.appendChild(form);
+                    
+                    console.log('✅ Submitting form to:', GOOGLE_SHEETS_URL, '(iframe fallback)');
+                    form.submit();
+
+                    // Cleanup after delay
+                    setTimeout(() => {
+                        try {
+                            if (form.parentNode) form.parentNode.removeChild(form);
+                            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+                        } catch (e) {}
+                        resolve('iframe-submitted');
+                    }, 2000);
+                });
+            };
+            
+            const submitPromise = submitViaFetch();
+            
+            if (callback) {
+                submitPromise.then(() => callback()).catch(error => {
+                    console.error('❌ submitToGoogleSheets callback error:', error);
+                    callback(error);
+                });
+            }
+            
+            return submitPromise;
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function confirmSubmissionRecorded(submissionId, options = {}) {
+            const {
+                maxAttempts = 8,
+                delay = 1500
+            } = options;
+            
+            const normalizedId = (submissionId || '').toString().trim();
+            if (!normalizedId) {
+                console.warn('⚠️ confirmSubmissionRecorded called with empty submissionId');
+                return false;
+            }
+            
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                if (attempt > 1) {
+                    await wait(delay);
+                }
+                
+                try {
+                    const submissions = await getSubmissions();
+                    const found = submissions.some(sub => (sub.id || '').toString().trim() === normalizedId);
+                    if (found) {
+                        console.log(`✅ Submission ${normalizedId} confirmed on attempt ${attempt}/${maxAttempts}`);
+                        return true;
+                    } else {
+                        console.log(`⌛ Submission ${normalizedId} not found yet (attempt ${attempt}/${maxAttempts})`);
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ Error checking submissions on attempt ${attempt}/${maxAttempts}:`, error);
+                }
+            }
+            
+            console.error(`❌ Failed to confirm submission ${normalizedId} after ${maxAttempts} attempts`);
+            return false;
         }
 
         // Helper function to normalize date strings to YYYY-MM-DD format (avoids timezone issues)
@@ -3390,14 +3469,33 @@
         // ============================================
         
         async function submitForm() {
+            if (!selectedDate) {
+                alert('Please select a date before submitting.');
+                return;
+            }
+            
+            if (!selectedTimeSlot) {
+                alert('Please select a time slot before submitting.');
+                return;
+            }
+            
             let foodType = selectedFood;
             if (selectedFood === 'Other' && document.getElementById('otherFoodText').value.trim()) {
                 foodType = `Other: ${document.getElementById('otherFoodText').value}`;
             }
             
-            const timeSlotId = selectedTimeSlot ? selectedTimeSlot.id : '';
-            const startTime = selectedTimeSlot ? (selectedTimeSlot.startTime || selectedTimeSlot.time.split(' - ')[0]) : '';
-            const endTime = selectedTimeSlot ? (selectedTimeSlot.endTime || selectedTimeSlot.time.split(' - ')[1]) : '';
+            const slot = selectedTimeSlot || {};
+            const timeSlotId = slot.id || slot.timeSlotId || slot.slotId || '';
+            const rawTime = slot.time || '';
+            const derivedStart = rawTime.includes(' - ') ? rawTime.split(' - ')[0] : '';
+            const derivedEnd = rawTime.includes(' - ') ? rawTime.split(' - ')[1] : '';
+            const startTime = slot.startTime || derivedStart;
+            const endTime = slot.endTime || derivedEnd;
+            
+            if (!timeSlotId || !startTime || !endTime) {
+                alert('The selected time slot is missing required details. Please select a different slot or try again.');
+                return;
+            }
             
             const submissionData = {
                 submissionId: Date.now().toString(),
@@ -3414,10 +3512,27 @@
 
             showSpaceshipAnimation('Saving your submission to Google Sheets...');
 
-            submitToGoogleSheets('submit', submissionData, () => {
+            try {
+                await submitToGoogleSheets('submit', submissionData);
+                
+                const saved = await confirmSubmissionRecorded(submissionData.submissionId);
                 hideSpaceshipAnimation();
+                
+                if (!saved) {
+                    alert('We could not confirm that your submission was saved. Please try again in a few seconds.');
+                    return;
+                }
+                
+                // Invalidate cached data so future views refetch latest info
+                calendarDataCache.loaded = false;
+                adminCalendarDataCache.loaded = false;
+                
                 nextStep();
-            });
+            } catch (error) {
+                console.error('❌ Failed to submit form:', error);
+                hideSpaceshipAnimation();
+                alert('Something went wrong while saving your submission. Please check your connection and try again.');
+            }
         }
 
         function resetForm() {
