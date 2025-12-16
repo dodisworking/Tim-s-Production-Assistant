@@ -3052,7 +3052,7 @@
         // ============================================
         
         // Google Sheets API Configuration
-        const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbw7awD8AE1yuKegwRQiniXiNeYLYg2ZYwScG-LcfTY5pQqu1yc3Jj3fukqHepGaJXdI/exec';
+        const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyjAU_VPvpLasMAm-TKjtbzVFH2jZips2bHQI2ynOfhsp-A94NVDPYJ3H05qEorW5id/exec';
 
         // ============================================
         // GET OPERATIONS (Fetch Data)
@@ -4940,6 +4940,8 @@
         }
 
         function drawPosterText(ctx, width, height, bookings, monthLabel) {
+            // Calculate maximum text width with padding (leave 10% margin on each side)
+            const maxTextWidth = width * 0.8;
             const baseFontSize = Math.max(height * 0.036, width * 0.028);
             const subFontSize = baseFontSize * 0.55;
             const lineGap = subFontSize * 0.35;
@@ -4975,24 +4977,44 @@
 
             const centerX = width / 2;
 
+            // Helper function to get font size that fits within maxWidth
+            function getFittingFontSize(text, initialFontSize, maxWidth) {
+                let fontSize = initialFontSize;
+                ctx.font = `700 ${Math.round(fontSize)}px "Arial Black", "Arial", sans-serif`;
+                let textWidth = ctx.measureText(text).width;
+                
+                // Reduce font size until text fits
+                while (textWidth > maxWidth && fontSize > 10) {
+                    fontSize = fontSize * 0.9; // Reduce by 10%
+                    ctx.font = `700 ${Math.round(fontSize)}px "Arial Black", "Arial", sans-serif`;
+                    textWidth = ctx.measureText(text).width;
+                }
+                
+                return Math.max(fontSize, 10); // Minimum font size of 10px
+            }
+
             let cursorY = startY;
 
             bookings.forEach((booking, index) => {
                 const { heading, subheading } = buildPosterLines(booking, monthLabel);
 
-                ctx.font = `700 ${Math.round(baseFontSize)}px "Arial Black", "Arial", sans-serif`;
+                // Calculate fitting font size for heading
+                const headingFontSize = getFittingFontSize(heading, baseFontSize, maxTextWidth);
+                ctx.font = `700 ${Math.round(headingFontSize)}px "Arial Black", "Arial", sans-serif`;
                 ctx.shadowBlur = 0;
                 ctx.lineWidth = 0;
                 ctx.fillText(heading, centerX, cursorY);
 
-                cursorY += baseFontSize + lineGap;
+                cursorY += headingFontSize + lineGap;
 
-                ctx.font = `700 ${Math.round(subFontSize)}px "Arial Black", "Arial", sans-serif`;
+                // Calculate fitting font size for subheading (relative to heading size)
+                const subheadingFontSize = getFittingFontSize(subheading, headingFontSize * 0.55, maxTextWidth);
+                ctx.font = `700 ${Math.round(subheadingFontSize)}px "Arial Black", "Arial", sans-serif`;
                 ctx.shadowBlur = 0;
                 ctx.lineWidth = 0;
                 ctx.fillText(subheading, centerX, cursorY);
 
-                cursorY += subFontSize;
+                cursorY += subheadingFontSize;
                 if (index !== bookings.length - 1) {
                     cursorY += spacing;
                 } else if (spacing > 0) {
